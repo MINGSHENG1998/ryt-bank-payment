@@ -3,6 +3,7 @@ import { View, Text, TextInput, Button, StyleSheet, Alert } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
+import { useBalance } from "../context/BalanceContext";
 import { RootStackParamList } from "../navigation/AppNavigator";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, "Payment">;
@@ -12,7 +13,7 @@ export default function PaymentScreen() {
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
-  const [balance] = useState(5201314);
+  const { balance, updateBalance } = useBalance();
 
   //todo: update mock api to simulate network issue etc
   const processPayment = async (paymentData: any) => {
@@ -66,13 +67,14 @@ export default function PaymentScreen() {
         },
         amount: transferAmount,
         note: note.trim(),
-        timestamp: new Date().toISOString(),
+        date: new Date().toISOString(),
       };
 
       const result = await processPayment(transactionData);
 
       if (result.success) {
         Alert.alert("Success", "Transfer completed successfully");
+        updateBalance(Number(amount));
         navigation.navigate("Confirmation", { transaction: result }); //todo: rmb to add confirmation screen
       }
     } catch (err) {
