@@ -1,16 +1,17 @@
-import { NavigationContainer } from "@react-navigation/native";
-import { createStackNavigator } from "@react-navigation/stack";
-
-import { Transaction } from "../types";
-import HomeScreen from "../screens/HomeScreen";
-import PaymentScreen from "../screens/PaymentScreen";
-import { BalanceProvider } from "../context/BalanceContext";
-import ConfirmationScreen from "../screens/ConfirmationScreen";
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import { Transaction } from '../types';
+import HomeScreen from '../screens/HomeScreen';
+import PaymentScreen from '../screens/PaymentScreen';
+import TransactionHistoryScreen from '../screens/TransactionHistoryScreen';
+import ConfirmationScreen from '../screens/ConfirmationScreen';
+import { BalanceProvider } from '../context/BalanceContext';
 
 export type RootStackParamList = {
   Home: undefined;
   Payment: undefined;
-  Confirmation: { transaction: Transaction }; //todo: add confirmation screen later
+  TransactionHistory: undefined;
+  Confirmation: { transaction: Transaction & { status: string } };
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -23,17 +24,22 @@ export default function AppNavigator() {
           <Stack.Screen
             name="Home"
             component={HomeScreen}
-            options={{ title: "Ryt Bank" }}
+            options={{ headerShown: false }}
           />
           <Stack.Screen
             name="Payment"
             component={PaymentScreen}
-            options={{ title: "Transfer Money" }}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="TransactionHistory"
+            component={TransactionHistoryScreen}
+            options={{ headerShown: false }}
           />
           <Stack.Screen
             name="Confirmation"
             component={ConfirmationScreen}
-            options={{ title: "Transaction Confirmation" }}
+            options={{ headerShown: false }}
           />
         </Stack.Navigator>
       </NavigationContainer>

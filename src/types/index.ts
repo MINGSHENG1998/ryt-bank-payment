@@ -16,3 +16,8 @@ export interface Transaction {
 export interface Account {
   balance: number;
 }
+
+export interface Contact {
+  id: string;
+  name: string;
+}
