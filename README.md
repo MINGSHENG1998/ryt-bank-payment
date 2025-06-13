@@ -28,3 +28,20 @@ Follow these steps to set up the project locally:
    npx expo start --tunnel
 
 ## Demo Video: https://drive.google.com/file/d/1D8NYKHg1Shyp8TpNoAjxPyPYnavtjSyZ/view?usp=drive_link
+
+## Design Decision & Challenge
+
+1. Faced a design limitation while implementing the "Recent Payment" section on the payment page, as most of the screen space was already occupied.
+   Solution: Introduced a tab layout to group User Contacts and Recent Transactions together.
+
+2. Initial implementation only included a Payment Page and a Confirmation Page as per requirements. However, this made the app appear unpolished and lacking in content.
+   Solution: Designed and added a Home Page (UI inspired by Touch 'n Go) along with a Transaction History section to enhance overall appearance and functionality.
+
+3. Grammar inconsistencies in labels and text affected the app’s professional look.
+   Solution: Improved all text and labels using AI tools to ensure proper grammar and consistency.
+
+## Potential New Feature
+
+1.  Internationalisation / Translation: Implement multiple language support using the i18n library to cater to diverse users.
+
+2.  Theme Switcher: Add a feature to toggle between Light Mode and Dark Mode for better user experience and accessibility.
