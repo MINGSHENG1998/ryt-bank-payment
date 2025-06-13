@@ -27,6 +27,11 @@ Follow these steps to set up the project locally:
 
    npx expo start --tunnel
 
+## Export to APK
+
+1. **follow the guide**:
+   https://docs.expo.dev/build-reference/apk/
+
 ## Demo Video: https://drive.google.com/file/d/1D8NYKHg1Shyp8TpNoAjxPyPYnavtjSyZ/view?usp=drive_link
 
 ## Design Decision & Challenge
