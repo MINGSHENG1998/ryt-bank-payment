@@ -10,6 +10,7 @@ import {
   ScrollView,
   StatusBar,
   ActivityIndicator,
+  Modal,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -39,7 +40,12 @@ export default function PaymentScreen() {
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>(
     []
   );
-  const [activeTab, setActiveTab] = useState("contacts");
+  const [activeTab, setActiveTab] = useState<"contacts" | "recent">("contacts");
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pin, setPin] = useState("");
+  const [pinValidationCallback, setPinValidationCallback] = useState<
+    ((result: boolean) => void) | null
+  >(null);
   const { balance, updateBalance } = useBalance();
 
   useEffect(() => {
@@ -104,18 +110,40 @@ export default function PaymentScreen() {
     }
   };
 
+  const selectRecentTransaction = (transaction: Transaction) => {
+    setRecipient(transaction.recipient.name);
+    setAmount(transaction.amount.toString());
+    setNote(transaction.note || "");
+  };
+
   const validateBiometric = async () => {
     try {
       if (!biometricAvailable) {
-        Alert.alert(
-          "Authentication Required",
-          "Biometric authentication is not available. Please set up Face ID, Touch ID, or fingerprint in your device settings.",
-          [
-            { text: "Cancel", style: "cancel" },
-            { text: "Continue Anyway", onPress: () => true },
-          ]
-        );
-        return false;
+        // Show PIN/Passcode validation for devices without biometric
+        return new Promise((resolve) => {
+          Alert.alert(
+            "Confirm Transaction",
+            "Biometric authentication is not available. Would you like to use a PIN or proceed without additional authentication?",
+            [
+              {
+                text: "Cancel",
+                style: "cancel",
+                onPress: () => resolve(false),
+              },
+              {
+                text: "Use PIN",
+                onPress: async () => {
+                  const pinResult = await showPinValidation();
+                  resolve(pinResult);
+                },
+              },
+              {
+                text: "Proceed",
+                onPress: () => resolve(true),
+              },
+            ]
+          );
+        });
       }
 
       const result = await LocalAuthentication.authenticateAsync({
@@ -128,20 +156,70 @@ export default function PaymentScreen() {
       if (result.success) {
         return true;
       } else {
-        console.log("Biometric authentication failed:", result.error);
+        console.error("Biometric authentication failed:", result.error);
         if (result.error === "user_cancel") {
           Alert.alert("Cancelled", "Transfer cancelled by user");
         } else if (result.error === "lockout") {
           Alert.alert("Too Many Attempts", "Please try again later");
+        } else if (result.error === "system_cancel") {
+          // Handle system cancellation (like when user switches apps)
+          Alert.alert("Authentication Cancelled", "Please try again");
         } else {
-          Alert.alert("Authentication Failed", "Please try again");
+          // For other failures, offer alternative confirmation
+          return new Promise((resolve) => {
+            Alert.alert(
+              "Authentication Failed",
+              "Biometric authentication failed. Would you like to use a PIN or proceed anyway?",
+              [
+                {
+                  text: "Cancel",
+                  style: "cancel",
+                  onPress: () => resolve(false),
+                },
+                {
+                  text: "Use PIN",
+                  onPress: async () => {
+                    const pinResult = await showPinValidation();
+                    resolve(pinResult);
+                  },
+                },
+                {
+                  text: "Proceed",
+                  onPress: () => resolve(true),
+                },
+              ]
+            );
+          });
         }
         return false;
       }
     } catch (error) {
       console.error("Biometric validation error:", error);
-      Alert.alert("Error", "Authentication failed. Please try again.");
-      return false;
+      // Fallback for any unexpected errors
+      return new Promise((resolve) => {
+        Alert.alert(
+          "Authentication Error",
+          "There was an issue with authentication. Would you like to use a PIN or proceed anyway?",
+          [
+            {
+              text: "Cancel",
+              style: "cancel",
+              onPress: () => resolve(false),
+            },
+            {
+              text: "Use PIN",
+              onPress: async () => {
+                const pinResult = await showPinValidation();
+                resolve(pinResult);
+              },
+            },
+            {
+              text: "Proceed",
+              onPress: () => resolve(true),
+            },
+          ]
+        );
+      });
     }
   };
 
@@ -216,17 +294,41 @@ export default function PaymentScreen() {
     setRecipient(contact.name);
   };
 
-  const selectRecentTransaction = (transaction: Transaction) => {
-    setRecipient(transaction.recipient.name);
-    setAmount(transaction.amount.toString());
-    setNote(transaction.note || "");
+  const showPinValidation = () => {
+    return new Promise<boolean>((resolve) => {
+      setPinValidationCallback(() => resolve);
+      setShowPinModal(true);
+      setPin("");
+    });
+  };
+
+  const handlePinSubmit = () => {
+    // Simple PIN validation - in a real app, this should be more secure
+    if (pin.length >= 4) {
+      setShowPinModal(false);
+      if (pinValidationCallback) {
+        pinValidationCallback(true);
+        setPinValidationCallback(null);
+      }
+    } else {
+      Alert.alert("Invalid PIN", "Please enter at least 4 digits");
+    }
+  };
+
+  const handlePinCancel = () => {
+    setShowPinModal(false);
+    setPin("");
+    if (pinValidationCallback) {
+      pinValidationCallback(false);
+      setPinValidationCallback(null);
+    }
   };
 
   const formatBalance = (amount: number) => {
-    return new Intl.NumberFormat('en-MY', {
-      style: 'currency',
-      currency: 'MYR',
-      minimumFractionDigits: 2
+    return new Intl.NumberFormat("en-MY", {
+      style: "currency",
+      currency: "MYR",
+      minimumFractionDigits: 2,
     }).format(amount);
   };
 
@@ -238,8 +340,8 @@ export default function PaymentScreen() {
     }
 
     return (
-      <ScrollView 
-        horizontal 
+      <ScrollView
+        horizontal
         showsHorizontalScrollIndicator={false}
         style={styles.horizontalScrollContainer}
       >
@@ -271,7 +373,7 @@ export default function PaymentScreen() {
     const limitedTransactions = recentTransactions.slice(0, 5);
 
     return (
-      <ScrollView 
+      <ScrollView
         style={styles.transactionsList}
         showsVerticalScrollIndicator={false}
         nestedScrollEnabled={true}
@@ -315,7 +417,10 @@ export default function PaymentScreen() {
           <View style={styles.headerSpacer} />
         </View>
 
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.balanceCard}>
             <Text style={styles.balanceLabel}>Available Balance</Text>
             <Text style={styles.balanceAmount}>{formatBalance(balance)}</Text>
@@ -324,10 +429,18 @@ export default function PaymentScreen() {
           <View style={styles.recipientSection}>
             <View style={styles.tabContainer}>
               <TouchableOpacity
-                style={[styles.tab, activeTab === "contacts" && styles.activeTab]}
+                style={[
+                  styles.tab,
+                  activeTab === "contacts" && styles.activeTab,
+                ]}
                 onPress={() => setActiveTab("contacts")}
               >
-                <Text style={[styles.tabText, activeTab === "contacts" && styles.activeTabText]}>
+                <Text
+                  style={[
+                    styles.tabText,
+                    activeTab === "contacts" && styles.activeTabText,
+                  ]}
+                >
                   Contacts
                 </Text>
               </TouchableOpacity>
@@ -335,14 +448,21 @@ export default function PaymentScreen() {
                 style={[styles.tab, activeTab === "recent" && styles.activeTab]}
                 onPress={() => setActiveTab("recent")}
               >
-                <Text style={[styles.tabText, activeTab === "recent" && styles.activeTabText]}>
+                <Text
+                  style={[
+                    styles.tabText,
+                    activeTab === "recent" && styles.activeTabText,
+                  ]}
+                >
                   Recent
                 </Text>
               </TouchableOpacity>
             </View>
 
             <View style={styles.listContainer}>
-              {activeTab === "contacts" ? renderContacts() : renderRecentTransactions()}
+              {activeTab === "contacts"
+                ? renderContacts()
+                : renderRecentTransactions()}
             </View>
           </View>
 
@@ -409,7 +529,8 @@ export default function PaymentScreen() {
               <View style={styles.securityWarning}>
                 <Text style={styles.warningIcon}>⚠️</Text>
                 <Text style={styles.warningText}>
-                  Set up biometric authentication for enhanced security
+                  Biometric authentication not available. Transactions will
+                  require manual confirmation.
                 </Text>
               </View>
             )}
@@ -418,7 +539,10 @@ export default function PaymentScreen() {
 
         <View style={styles.bottomSection}>
           <TouchableOpacity
-            style={[styles.sendButton, isProcessing && styles.sendButtonDisabled]}
+            style={[
+              styles.sendButton,
+              isProcessing && styles.sendButtonDisabled,
+            ]}
             onPress={handleTransfer}
             disabled={isProcessing}
             activeOpacity={0.8}
@@ -430,6 +554,50 @@ export default function PaymentScreen() {
             )}
           </TouchableOpacity>
         </View>
+
+        {/* PIN Validation Modal */}
+        <Modal
+          visible={showPinModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={handlePinCancel}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.pinModal}>
+              <Text style={styles.pinModalTitle}>Enter PIN</Text>
+              <Text style={styles.pinModalSubtitle}>
+                Please enter your PIN to confirm the transaction
+              </Text>
+
+              <TextInput
+                style={styles.pinInput}
+                value={pin}
+                onChangeText={setPin}
+                placeholder="Enter PIN"
+                keyboardType="number-pad"
+                secureTextEntry={true}
+                maxLength={6}
+                autoFocus={true}
+              />
+
+              <View style={styles.pinModalButtons}>
+                <TouchableOpacity
+                  style={[styles.pinModalButton, styles.pinModalCancelButton]}
+                  onPress={handlePinCancel}
+                >
+                  <Text style={styles.pinModalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.pinModalButton, styles.pinModalConfirmButton]}
+                  onPress={handlePinSubmit}
+                >
+                  <Text style={styles.pinModalConfirmText}>Confirm</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </SafeAreaView>
   );
@@ -738,5 +906,76 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 18,
     fontWeight: "600",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  pinModal: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    padding: 24,
+    width: "80%",
+    maxWidth: 320,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  pinModalTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#1e293b",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  pinModalSubtitle: {
+    fontSize: 14,
+    color: "#64748b",
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  pinInput: {
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 18,
+    textAlign: "center",
+    letterSpacing: 8,
+    marginBottom: 24,
+  },
+  pinModalButtons: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  pinModalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  pinModalCancelButton: {
+    backgroundColor: "#f1f5f9",
+  },
+  pinModalConfirmButton: {
+    backgroundColor: "#1a365d",
+  },
+  pinModalCancelText: {
+    color: "#64748b",
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  pinModalConfirmText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "500",
   },
 });
