@@ -5,7 +5,6 @@ import {
   TextInput,
   StyleSheet,
   Alert,
-  FlatList,
   TouchableOpacity,
   SafeAreaView,
   ScrollView,
@@ -72,13 +71,8 @@ export default function PaymentScreen() {
       });
 
       setBiometricTypes(typeNames);
-      console.log("Biometric support:", {
-        hasHardware,
-        isEnrolled,
-        supportedTypes,
-      });
     } catch (error) {
-      console.log("Error checking biometric support:", error);
+      console.error("Error checking biometric support:", error);
       setBiometricAvailable(false);
     }
   };
@@ -132,7 +126,6 @@ export default function PaymentScreen() {
       });
 
       if (result.success) {
-        console.log("Biometric authentication successful");
         return true;
       } else {
         console.log("Biometric authentication failed:", result.error);
@@ -239,6 +232,74 @@ export default function PaymentScreen() {
 
   const quickAmounts = [50, 100, 200, 500];
 
+  const renderContacts = () => {
+    if (contacts.length === 0) {
+      return <Text style={styles.emptyText}>No contacts found</Text>;
+    }
+
+    return (
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        style={styles.horizontalScrollContainer}
+      >
+        {contacts.map((contact) => (
+          <TouchableOpacity
+            key={contact.id}
+            onPress={() => selectContact(contact)}
+            style={styles.contactItem}
+            activeOpacity={0.7}
+          >
+            <View style={styles.contactAvatar}>
+              <Text style={styles.contactInitial}>
+                {contact.name.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+            <Text style={styles.contactName}>{contact.name}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    );
+  };
+
+  const renderRecentTransactions = () => {
+    if (recentTransactions.length === 0) {
+      return <Text style={styles.emptyText}>No recent transfers</Text>;
+    }
+
+    // Limit to first 5 items for better UX
+    const limitedTransactions = recentTransactions.slice(0, 5);
+
+    return (
+      <ScrollView 
+        style={styles.transactionsList}
+        showsVerticalScrollIndicator={false}
+        nestedScrollEnabled={true}
+      >
+        {limitedTransactions.map((transaction) => (
+          <TouchableOpacity
+            key={transaction.id}
+            onPress={() => selectRecentTransaction(transaction)}
+            style={styles.transactionItem}
+            activeOpacity={0.7}
+          >
+            <View style={styles.transactionIcon}>
+              <Text style={styles.transactionIconText}>↗</Text>
+            </View>
+            <View style={styles.transactionDetails}>
+              <Text style={styles.transactionName}>
+                {transaction.recipient.name}
+              </Text>
+              <Text style={styles.transactionAmount}>
+                {formatBalance(transaction.amount)}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#1a365d" />
@@ -281,60 +342,7 @@ export default function PaymentScreen() {
             </View>
 
             <View style={styles.listContainer}>
-              {activeTab === "contacts" ? (
-                <FlatList
-                  data={contacts}
-                  keyExtractor={(item) => item.id}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      onPress={() => selectContact(item)}
-                      style={styles.contactItem}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.contactAvatar}>
-                        <Text style={styles.contactInitial}>
-                          {item.name.charAt(0).toUpperCase()}
-                        </Text>
-                      </View>
-                      <Text style={styles.contactName}>{item.name}</Text>
-                    </TouchableOpacity>
-                  )}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={styles.horizontalList}
-                  ListEmptyComponent={
-                    <Text style={styles.emptyText}>No contacts found</Text>
-                  }
-                />
-              ) : (
-                <FlatList
-                  data={recentTransactions}
-                  keyExtractor={(item) => item.id}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      onPress={() => selectRecentTransaction(item)}
-                      style={styles.transactionItem}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.transactionIcon}>
-                        <Text style={styles.transactionIconText}>↗</Text>
-                      </View>
-                      <View style={styles.transactionDetails}>
-                        <Text style={styles.transactionName}>
-                          {item.recipient.name}
-                        </Text>
-                        <Text style={styles.transactionAmount}>
-                          {formatBalance(item.amount)}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  )}
-                  style={styles.verticalList}
-                  ListEmptyComponent={
-                    <Text style={styles.emptyText}>No recent transfers</Text>
-                  }
-                />
-              )}
+              {activeTab === "contacts" ? renderContacts() : renderRecentTransactions()}
             </View>
           </View>
 
@@ -544,11 +552,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 16,
   },
-  horizontalList: {
+  horizontalScrollContainer: {
     minHeight: 100,
   },
-  verticalList: {
-    maxHeight: 150,
+  transactionsList: {
+    maxHeight: 160,
   },
   contactItem: {
     alignItems: "center",
